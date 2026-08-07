@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import json
 from dataclasses import dataclass, field
+from pathlib import Path
 
 
 @dataclass
@@ -25,6 +26,7 @@ class MonitoringAlert:
     block_rate_threshold: float = 0.5
     rate_limit_hit_threshold: int = 5
     judge_fail_rate_threshold: float = 0.3
+    egress_denial_threshold: int = 3
     alerts: list[Alert] = field(default_factory=list)
 
     # Counters — update these from your pipeline after each request
@@ -33,14 +35,74 @@ class MonitoringAlert:
     rate_limit_hits: int = 0
     judge_checks: int = 0
     judge_fails: int = 0
+    egress_denials: int = 0
+
+    def __post_init__(self):
+        for name, value in (
+            ("block_rate_threshold", self.block_rate_threshold),
+            ("judge_fail_rate_threshold", self.judge_fail_rate_threshold),
+        ):
+            if not 0 <= value <= 1:
+                raise ValueError(f"{name} must be between 0 and 1")
+        if self.rate_limit_hit_threshold < 1:
+            raise ValueError("rate_limit_hit_threshold must be at least 1")
+        if self.egress_denial_threshold < 1:
+            raise ValueError("egress_denial_threshold must be at least 1")
 
     def check_metrics(self) -> list[Alert]:
-        """TODO: compute rates, append Alert objects when thresholds exceeded."""
-        raise NotImplementedError("Implement MonitoringAlert.check_metrics")
+        """Recompute current alerts without duplicating earlier snapshots."""
+        self.alerts = []
+        block_rate = (
+            self.blocked_requests / self.total_requests
+            if self.total_requests
+            else 0.0
+        )
+        judge_fail_rate = (
+            self.judge_fails / self.judge_checks if self.judge_checks else 0.0
+        )
+
+        if self.total_requests and block_rate >= self.block_rate_threshold:
+            self.alerts.append(Alert(
+                metric="block_rate",
+                value=block_rate,
+                threshold=self.block_rate_threshold,
+                message="Blocked-request rate reached the investigation threshold.",
+            ))
+        if self.rate_limit_hits >= self.rate_limit_hit_threshold:
+            self.alerts.append(Alert(
+                metric="rate_limit_hits",
+                value=float(self.rate_limit_hits),
+                threshold=float(self.rate_limit_hit_threshold),
+                message="Rate-limit hits indicate possible flooding or cost abuse.",
+            ))
+        if self.judge_checks and judge_fail_rate >= self.judge_fail_rate_threshold:
+            self.alerts.append(Alert(
+                metric="judge_fail_rate",
+                value=judge_fail_rate,
+                threshold=self.judge_fail_rate_threshold,
+                message="Judge operational failures require fail-closed review.",
+            ))
+        if self.egress_denials >= self.egress_denial_threshold:
+            self.alerts.append(Alert(
+                metric="egress_denials",
+                value=float(self.egress_denials),
+                threshold=float(self.egress_denial_threshold),
+                message="Repeated egress denials may indicate exfiltration attempts.",
+            ))
+        return list(self.alerts)
 
     def export_json(self, filepath: str = "outputs/metrics.json"):
-        """TODO: write metrics + alerts to JSON."""
-        raise NotImplementedError("Implement MonitoringAlert.export_json")
+        """Write a fresh metrics snapshot and alerts to JSON."""
+        self.check_metrics()
+        path = Path(filepath)
+        if not path.is_absolute():
+            path = Path(__file__).resolve().parents[2] / path
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(
+            json.dumps(self.snapshot(), ensure_ascii=False, indent=2),
+            encoding="utf-8",
+        )
+        return path
 
     def snapshot(self) -> dict:
         block_rate = (
@@ -59,6 +121,7 @@ class MonitoringAlert:
             "judge_checks": self.judge_checks,
             "judge_fails": self.judge_fails,
             "judge_fail_rate": judge_fail_rate,
+            "egress_denials": self.egress_denials,
             "alerts": [
                 {
                     "metric": a.metric,

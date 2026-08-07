@@ -4,6 +4,10 @@ Làm sao để ứng dụng agent an toàn hơn?
 
 **Hình thức:** bài tập **cá nhân** (1 người / 1 MSSV).
 
+**Sinh viên:** Huỳnh Thị Hải Châu
+
+**MSSV:** 2A202601912
+
 **Đề bài duy nhất:** [`assignment11.md`](assignment11.md) · Cách nộp: [`SUBMISSION.md`](SUBMISSION.md)
 
 ---
@@ -15,9 +19,9 @@ Làm sao để ứng dụng agent an toàn hơn?
 python -m venv .venv
 .\.venv\Scripts\Activate.ps1
 
-# 2) API key
+# 2) OpenAI API key
 Copy-Item .env.example .env
-# Mở .env, dán GOOGLE_API_KEY — lấy tại https://aistudio.google.com/apikey
+# Mở .env, dán OPENAI_API_KEY — lấy tại https://platform.openai.com/api-keys
 
 # 3) Cài dependency trong venv
 python -m pip install -U pip
@@ -32,7 +36,7 @@ Nếu PowerShell báo không cho chạy script:
 PowerShell (nếu chưa load `.env`):
 
 ```powershell
-$env:GOOGLE_API_KEY="dán-key-của-bạn"
+$env:OPENAI_API_KEY="dán-key-của-bạn"
 ```
 
 ---
@@ -66,7 +70,7 @@ Hình thức: **cá nhân** (1 người / 1 MSSV). Luồng: **Setup → A → Br
 
 | # | Phần | Nội dung | Thời lượng |
 |---|------|----------|-----------:|
-| 0 | **Setup** | Cài đặt môi trường (`pip`, `GOOGLE_API_KEY`, chạy local) | 30' |
+| 0 | **Setup** | Cài đặt môi trường (`pip`, `OPENAI_API_KEY`, chạy local) | 30' |
 | 1 | **A · Phòng thủ** | 2A Input · 2B Output · 2C NeMo · Part 3 Testing · Part 4 HITL | 120' |
 | — | **Break** | Nghỉ giải lao | 10' |
 | 2 | **B · Tấn công** | Tấn công **Unsafe** (điểm B) + **Guards** (điểm cộng nếu LEAKED) | 60' |

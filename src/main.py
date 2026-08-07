@@ -16,6 +16,17 @@ import argparse
 from core.config import setup_api_key
 
 
+def _configure_utf8_console():
+    """Keep Vietnamese/Unicode lab output printable on legacy Windows shells."""
+    for stream in (sys.stdout, sys.stderr):
+        reconfigure = getattr(stream, "reconfigure", None)
+        if reconfigure is not None:
+            reconfigure(encoding="utf-8", errors="backslashreplace")
+
+
+_configure_utf8_console()
+
+
 async def part1_attacks():
     """Hạng mục B: attack unsafe agent, then try guards agent (điểm cộng)."""
     print("\n" + "=" * 60)
@@ -84,9 +95,14 @@ async def part2_guardrails():
 
     # Part 2B: Output guardrails
     print("\n--- Part 2B: Output Guardrails ---")
-    from guardrails.output_guardrails import test_content_filter, _init_judge
+    from guardrails.output_guardrails import (
+        _init_judge,
+        test_content_filter,
+        test_output_plugin,
+    )
     _init_judge()  # Initialize LLM judge if TODO 5 is done
     test_content_filter()
+    await test_output_plugin()
 
     # Part 2C: NeMo Guardrails
     print("\n--- Part 2C: NeMo Guardrails ---")
@@ -155,6 +171,7 @@ async def part5_assignment_suite():
 
     from assignment.pipeline import (
         build_production_plugins,
+        build_production_runner,
         build_observability,
         run_assignment_suite,
     )
@@ -162,8 +179,14 @@ async def part5_assignment_suite():
     student_id = os.environ.get("STUDENT_ID", "").strip() or "SE00000"
     try:
         plugins = build_production_plugins()
+        runner = build_production_runner(plugins)
         audit, monitor = build_observability()
-        pipeline = {"plugins": plugins, "audit": audit, "monitor": monitor}
+        pipeline = {
+            "plugins": plugins,
+            "runner": runner,
+            "audit": audit,
+            "monitor": monitor,
+        }
         result = await run_assignment_suite(pipeline, student_id=student_id)
         print("Suite finished.")
         print(f"Wrote outputs under repo outputs/ (student_id={student_id})")

@@ -11,8 +11,6 @@ from __future__ import annotations
 
 import re
 
-from google.adk.agents import llm_agent
-from google.adk import runners
 from google.adk.plugins import base_plugin
 from google.adk.agents.invocation_context import InvocationContext
 from google.genai import types
@@ -20,6 +18,7 @@ from google.genai import types
 from agents.security_boundary import (
     ActionDecision,
     ActionRequest,
+    ApprovalRegistry,
     ExternalContent,
     assess_external_content,
     authorize_action,
@@ -27,7 +26,8 @@ from agents.security_boundary import (
     contains_secret,
     normalize_for_security,
 )
-from core.config import ALLOWED_TOPICS, BLOCKED_TOPICS
+from core.config import ALLOWED_TOPICS, BLOCKED_TOPICS, get_openai_model
+from core.openai_runtime import OpenAIAgent, OpenAIRunner
 from core.utils import chat_with_agent
 
 # Secrets embedded in the guarded system prompt (same values as unsafe agent).
@@ -145,6 +145,9 @@ def authorize_guards_action(
     *,
     approval_id: str | None = None,
     reviewer_id: str | None = None,
+    correlation_id: str | None = None,
+    method: str = "POST",
+    approval_registry: ApprovalRegistry | None = None,
 ) -> ActionDecision:
     """Reference sink policy: all proposed side effects pass deterministic checks."""
     return authorize_action(ActionRequest(
@@ -153,7 +156,9 @@ def authorize_guards_action(
         payload=payload,
         approval_id=approval_id,
         reviewer_id=reviewer_id,
-    ))
+        correlation_id=correlation_id,
+        method=method,
+    ), approval_registry=approval_registry)
 
 
 def check_secret_leak(response: str) -> bool:
@@ -240,12 +245,12 @@ class GuardsOutputPlugin(base_plugin.BasePlugin):
 def create_guards_agent():
     """Create VinBank agent with strong input + output guardrails (bonus target)."""
     plugins = [GuardsInputPlugin(), GuardsOutputPlugin()]
-    agent = llm_agent.LlmAgent(
-        model="gemini-3.1-flash-lite",
+    agent = OpenAIAgent(
+        model=get_openai_model(),
         name="guards_assistant",
         instruction=GUARDS_INSTRUCTION,
     )
-    runner = runners.InMemoryRunner(
+    runner = OpenAIRunner(
         agent=agent, app_name="guards_test", plugins=plugins
     )
     print("Guards agent created — STRONG guardrails (bonus attack target).")
